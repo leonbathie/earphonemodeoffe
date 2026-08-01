@@ -48,7 +48,8 @@ class MediaOutputTileService : TileService() {
   private fun mediaOutputIntent(): Intent {
     // Le panneau dedie n'existe qu'a partir d'Android 10 ; avant, on ouvre les reglages son.
     val action =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Settings.Panel.ACTION_MEDIA_OUTPUT
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        "com.android.settings.panel.action.MEDIA_OUTPUT"
       else Settings.ACTION_SOUND_SETTINGS
     return Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
   }
