@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun openMediaOutputPicker() {
         val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Settings.Panel.ACTION_MEDIA_OUTPUT
+            "com.android.settings.panel.action.MEDIA_OUTPUT"
         } else {
             Settings.ACTION_SOUND_SETTINGS
         }
