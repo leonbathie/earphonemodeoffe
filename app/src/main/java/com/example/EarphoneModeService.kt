@@ -106,23 +106,7 @@ class EarphoneModeService : Service() {
                     }
                 }
 
-                // Reflection for AudioSystem.setForceUse
-                try {
-                    val audioSystemClass = Class.forName("android.media.AudioSystem")
-                    val setForceUseMethod = audioSystemClass.getMethod(
-                        "setForceUse",
-                        Int::class.javaPrimitiveType,
-                        Int::class.javaPrimitiveType
-                    )
-                    
-                    setForceUseMethod.invoke(null, 0, 1) // FOR_COMMUNICATION = 0, FORCE_SPEAKER = 1
-                    setForceUseMethod.invoke(null, 1, 1) // FOR_MEDIA = 1, FORCE_SPEAKER = 1
-                    setForceUseMethod.invoke(null, 2, 1) // FOR_RECORD = 2, FORCE_SPEAKER = 1
-                    setForceUseMethod.invoke(null, 4, 1) // FOR_SYSTEM = 4, FORCE_SPEAKER = 1
-                    setForceUseMethod.invoke(null, 7, 1) // FOR_VIBRATE_RINGING = 7, FORCE_SPEAKER = 1
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
 
                 // OEM Hardware Audio Parameters
                 try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
@@ -147,22 +131,7 @@ class EarphoneModeService : Service() {
                     } catch (e: Exception) {}
                 }
 
-                try {
-                    val audioSystemClass = Class.forName("android.media.AudioSystem")
-                    val setForceUseMethod = audioSystemClass.getMethod(
-                        "setForceUse",
-                        Int::class.javaPrimitiveType,
-                        Int::class.javaPrimitiveType
-                    )
-                    
-                    setForceUseMethod.invoke(null, 0, 0) // FORCE_NONE = 0
-                    setForceUseMethod.invoke(null, 1, 0) 
-                    setForceUseMethod.invoke(null, 2, 0) 
-                    setForceUseMethod.invoke(null, 4, 0) 
-                    setForceUseMethod.invoke(null, 7, 0) 
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(false))
 
                 try { audioManager.setParameters("routing=0") } catch (e: Exception) {}
                 try { audioManager.setParameters("force_speaker=0") } catch (e: Exception) {}

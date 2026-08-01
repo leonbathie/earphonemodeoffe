@@ -181,27 +181,18 @@ class MainActivity : ComponentActivity() {
 
     private fun testAudio() {
         try {
-            Toast.makeText(this, "Testing sound on Speaker...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Test en STREAM_MUSIC, comme TikTok...", Toast.LENGTH_SHORT).show()
 
             val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
-            
-            val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
 
-            // Re-apply force speaker
-            try {
-                val audioSystemClass = Class.forName("android.media.AudioSystem")
-                val setForceUseMethod = audioSystemClass.getMethod(
-                    "setForceUse",
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType
-                )
-                setForceUseMethod.invoke(null, 1, 1) // FOR_MEDIA, FORCE_SPEAKER
-                setForceUseMethod.invoke(null, 0, 1) // FOR_COMMUNICATION, FORCE_SPEAKER
-            } catch (e: Exception) {}
+            RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
 
-            // 1. Play synthesized PCM sine wave on AudioTrack (100% reliable, no file/permission dependencies)
+            // 1. Sinusoide synthetisee en USAGE_MEDIA / CONTENT_TYPE_MUSIC.
+            // C'est volontairement le meme chemin audio que TikTok ou YouTube : si ce son
+            // sort du haut-parleur, le forcage marche vraiment. L'ancien test utilisait
+            // USAGE_ALARM, que beaucoup de constructeurs routent vers le haut-parleur
+            // meme casque branche : il reussissait donc sans rien prouver.
             Thread {
                 try {
                     val sampleRate = 44100
@@ -224,8 +215,8 @@ class MainActivity : ComponentActivity() {
                     val audioTrack = AudioTrack.Builder()
                         .setAudioAttributes(
                             AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ALARM)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                                 .build()
                         )
                         .setAudioFormat(
@@ -248,15 +239,7 @@ class MainActivity : ComponentActivity() {
                 }
             }.start()
 
-            // 2. Play ToneGenerator Beep
-            try {
-                val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-                toneGen.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 800)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            // 3. Play Ringtone Sound
+            // 2. Play Ringtone Sound (deja en USAGE_MEDIA plus bas)
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 
@@ -358,21 +341,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                try {
-                    val audioSystemClass = Class.forName("android.media.AudioSystem")
-                    val setForceUseMethod = audioSystemClass.getMethod(
-                        "setForceUse",
-                        Int::class.javaPrimitiveType,
-                        Int::class.javaPrimitiveType
-                    )
-                    setForceUseMethod.invoke(null, 0, 1) // FOR_COMMUNICATION, FORCE_SPEAKER
-                    setForceUseMethod.invoke(null, 1, 1) // FOR_MEDIA, FORCE_SPEAKER
-                    setForceUseMethod.invoke(null, 2, 1) // FOR_RECORD, FORCE_SPEAKER
-                    setForceUseMethod.invoke(null, 4, 1) // FOR_SYSTEM, FORCE_SPEAKER
-                    setForceUseMethod.invoke(null, 7, 1) // FOR_VIBRATE_RINGING, FORCE_SPEAKER
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
 
                 // OEM Hardware Audio Parameters
                 try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
@@ -396,21 +365,7 @@ class MainActivity : ComponentActivity() {
                     } catch (e: Exception) {}
                 }
                 
-                try {
-                    val audioSystemClass = Class.forName("android.media.AudioSystem")
-                    val setForceUseMethod = audioSystemClass.getMethod(
-                        "setForceUse",
-                        Int::class.javaPrimitiveType,
-                        Int::class.javaPrimitiveType
-                    )
-                    setForceUseMethod.invoke(null, 0, 0) // FOR_COMMUNICATION, FORCE_NONE
-                    setForceUseMethod.invoke(null, 1, 0) // FOR_MEDIA, FORCE_NONE
-                    setForceUseMethod.invoke(null, 2, 0) // FOR_RECORD, FORCE_NONE
-                    setForceUseMethod.invoke(null, 4, 0) // FOR_SYSTEM, FORCE_NONE
-                    setForceUseMethod.invoke(null, 7, 0)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(false))
 
                 try { audioManager.setParameters("routing=0") } catch (e: Exception) {}
                 try { audioManager.setParameters("force_speaker=0") } catch (e: Exception) {}
@@ -627,7 +582,8 @@ fun EarphoneModeScreen(
                                  "SpeakerphoneOn: $isSpeakerOn\n" +
                                  "WiredHeadset Detected: $isWired\n" +
                                  "CommDevice: $commDeviceStr\n" +
-                                 "Media Volume: $musicVol / $maxMusicVol"
+                                 "Media Volume: $musicVol / $maxMusicVol\n" +
+                                 "setForceUse: ${RoutingDiagnostics.forceUse}"
                 
                 kotlinx.coroutines.delay(1000)
             }
