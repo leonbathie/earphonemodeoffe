@@ -34,6 +34,19 @@
             android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
 
+        <!-- Tuile de reglages rapides : ouvre le selecteur de sortie audio par-dessus
+             n'importe quelle application, sans quitter la video en cours. -->
+        <service
+            android:name=".MediaOutputTileService"
+            android:exported="true"
+            android:icon="@android:drawable/ic_lock_silent_mode_off"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

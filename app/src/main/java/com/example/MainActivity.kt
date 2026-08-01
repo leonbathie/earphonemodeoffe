@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -155,9 +156,41 @@ class MainActivity : ComponentActivity() {
                         },
                         onResetAudio = {
                             resetAudio()
+                        },
+                        onOpenOutputPicker = {
+                            openMediaOutputPicker()
                         }
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Ouvre le selecteur de sortie audio d'Android.
+     *
+     * C'est la seule bascule vers le haut-parleur qui aboutisse reellement sans permission
+     * systeme, le forcage par AudioSystem.setForceUse etant refuse aux applications
+     * ordinaires. L'API du panneau dedie date d'Android 10 ; avant, on retombe sur les
+     * reglages son.
+     */
+    private fun openMediaOutputPicker() {
+        val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Settings.Panel.ACTION_MEDIA_OUTPUT
+        } else {
+            Settings.ACTION_SOUND_SETTINGS
+        }
+        try {
+            startActivity(Intent(action))
+        } catch (e: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_SOUND_SETTINGS))
+            } catch (e2: Exception) {
+                Toast.makeText(
+                    this,
+                    "Sélecteur de sortie indisponible sur cet appareil.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
@@ -419,7 +452,8 @@ fun EarphoneModeScreen(
     onSpeakerModeChanged: (Boolean) -> Unit,
     onMuteSettingChanged: (Boolean) -> Unit,
     onTestAudio: () -> Unit,
-    onResetAudio: () -> Unit
+    onResetAudio: () -> Unit,
+    onOpenOutputPicker: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -516,9 +550,10 @@ fun EarphoneModeScreen(
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = "Lancez la vidéo, déroulez le volet de notifications, touchez " +
-                                   "l'icône de sortie audio du panneau média, puis choisissez " +
-                                   "« Haut-parleur du téléphone ».",
+                            text = "Utilisez « Choisir la sortie audio » ci-dessous, puis " +
+                                   "sélectionnez « Haut-parleur du téléphone ». Pendant une " +
+                                   "vidéo, la tuile des réglages rapides fait la même chose " +
+                                   "sans quitter l'application.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -533,6 +568,29 @@ fun EarphoneModeScreen(
                 }
             }
         }
+
+        // Action principale : c'est la seule qui bascule reellement le son vers le
+        // haut-parleur, on lui donne donc la place et le poids visuel d'un bouton primaire.
+        Button(
+            onClick = onOpenOutputPicker,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Icon(Icons.Default.Speaker, contentDescription = null)
+            Spacer(modifier = Modifier.width(10.dp))
+            Text("Choisir la sortie audio", style = MaterialTheme.typography.titleSmall)
+        }
+
+        Text(
+            text = "Ajoutez la tuile « Sortie audio » à vos réglages rapides pour y accéder " +
+                   "sans quitter TikTok ou YouTube.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
         // Main Toggle Controls
         Row(
