@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">EarphoneModeOff</string>
+    <string name="tile_label">Sortie audio</string>
 </resources>
