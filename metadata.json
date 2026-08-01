@@ -1,0 +1,6 @@
+{
+  "name": "EarphoneModeOff",
+  "description": "A utility to force audio output to speakers, fixing devices stuck in earphone mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

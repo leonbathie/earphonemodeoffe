@@ -1,0 +1,61 @@
+name: Build APK
+
+# Lance le build a chaque push, ou manuellement depuis l'onglet Actions
+# (bouton "Run workflow") — utile pour relancer depuis le telephone.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # necessaire pour publier l'APK dans une Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # AGP 9.x exige JDK 17 minimum ; 21 est la version fournie par Android Studio.
+      - name: Installer le JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Installe les cmdline-tools et accepte les licences SDK, pour qu'AGP puisse
+      # telecharger la plateforme android-36.1 demandee par compileSdk.
+      - name: Installer le SDK Android
+        uses: android-actions/setup-android@v3
+
+      # Ce projet (export AI Studio) n'a PAS de wrapper Gradle : on installe Gradle ici.
+      # Si le log echoue avec "Minimum supported Gradle version is X",
+      # remplacer la version ci-dessous par X et repousser.
+      - name: Installer Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.1.0'
+
+      - name: Compiler l'APK debug
+        run: gradle assembleDebug --stacktrace
+
+      # Chemin 1 : artefact de build. Se telecharge en .zip, il faut le decompresser.
+      - name: Publier l'APK en artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: earphonemodeoff-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # Chemin 2 : Release. Donne un lien direct vers le .apk, installable en un tap
+      # depuis le navigateur du telephone — sans decompression.
+      - name: Publier l'APK dans la Release "debug-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete debug-latest --yes --cleanup-tag || true
+          gh release create debug-latest \
+            app/build/outputs/apk/debug/*.apk \
+            --title "APK debug (dernier build)" \
+            --notes "Build automatique du commit ${GITHUB_SHA:0:7}. Installer via 'Sources inconnues'."
