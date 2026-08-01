@@ -96,8 +96,11 @@ class MainActivity : ComponentActivity() {
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         sharedPreferences = getSharedPreferences("EarphoneModePrefs", Context.MODE_PRIVATE)
         
-        // Load persisted settings
-        muteOnDisconnect = sharedPreferences.getBoolean("muteOnDisconnect", true)
+        // Load persisted settings.
+        // muteOnDisconnect est desactive par defaut : sur un telephone dont la detection de
+        // casque est defaillante, ACTION_AUDIO_BECOMING_NOISY part en rafale et cette option
+        // remet le volume media a zero a chaque fois, ce qui rend le telephone inutilisable.
+        muteOnDisconnect = sharedPreferences.getBoolean("muteOnDisconnect", false)
         isSpeakerMode = sharedPreferences.getBoolean("isSpeakerMode", true)
         
         // Apply immediately on startup
@@ -310,12 +313,29 @@ class MainActivity : ComponentActivity() {
             try { audioManager.setParameters("speaker=off") } catch (e: Exception) {}
             try { audioManager.setParameters("AudioSetForceToSpeaker=false") } catch (e: Exception) {}
 
+            // Tout arreter, sinon le service reapplique le forcage dans la seconde et
+            // BootReceiver le relance au prochain demarrage.
+            isSpeakerMode = false
+            muteOnDisconnect = false
+            sharedPreferences.edit()
+                .putBoolean("isSpeakerMode", false)
+                .putBoolean("muteOnDisconnect", false)
+                .apply()
+            stopService(Intent(this, EarphoneModeService::class.java))
+
+            // Remonter le volume media systematiquement : la coupure automatique a pu le
+            // laisser a zero, et c'est precisement le symptome qu'on vient reparer.
             val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val currVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            if (currVol == 0) {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.7).toInt(), AudioManager.FLAG_SHOW_UI)
-            }
-            Toast.makeText(this, "Audio routing restored to default", Toast.LENGTH_SHORT).show()
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                (maxVol * 0.7).toInt(),
+                AudioManager.FLAG_SHOW_UI
+            )
+            Toast.makeText(
+                this,
+                "Routage par défaut restauré, service arrêté, volume rétabli.",
+                Toast.LENGTH_LONG
+            ).show()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -344,11 +364,16 @@ class MainActivity : ComponentActivity() {
                 
                 RoutingDiagnostics.applyForceUse(true)
 
-                // OEM Hardware Audio Parameters
-                try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
-                try { audioManager.setParameters("force_speaker=1") } catch (e: Exception) {}
-                try { audioManager.setParameters("speaker=on") } catch (e: Exception) {}
-                try { audioManager.setParameters("AudioSetForceToSpeaker=true") } catch (e: Exception) {}
+                // Commandes brutes au pilote audio du constructeur. Non documentees et non
+                // validees : contrairement a setForceUse, elles passent vraiment, donc elles
+                // peuvent coincer le routage. Si le systeme a deja refuse l'API documentee,
+                // elles n'ont aucune chance d'aboutir proprement et on s'abstient.
+                if (!RoutingDiagnostics.forcingRefused) {
+                    try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
+                    try { audioManager.setParameters("force_speaker=1") } catch (e: Exception) {}
+                    try { audioManager.setParameters("speaker=on") } catch (e: Exception) {}
+                    try { audioManager.setParameters("AudioSetForceToSpeaker=true") } catch (e: Exception) {}
+                }
 
                 // Maximize volume streams
                 val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)

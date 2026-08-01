@@ -113,11 +113,14 @@ class EarphoneModeService : Service() {
 
                 RoutingDiagnostics.applyForceUse(true)
 
-                // OEM Hardware Audio Parameters
-                try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
-                try { audioManager.setParameters("force_speaker=1") } catch (e: Exception) {}
-                try { audioManager.setParameters("speaker=on") } catch (e: Exception) {}
-                try { audioManager.setParameters("AudioSetForceToSpeaker=true") } catch (e: Exception) {}
+                // Voir MainActivity.forceSpeaker : on n'envoie pas de commandes brutes au
+                // pilote quand le systeme a deja refuse l'API documentee.
+                if (!RoutingDiagnostics.forcingRefused) {
+                    try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
+                    try { audioManager.setParameters("force_speaker=1") } catch (e: Exception) {}
+                    try { audioManager.setParameters("speaker=on") } catch (e: Exception) {}
+                    try { audioManager.setParameters("AudioSetForceToSpeaker=true") } catch (e: Exception) {}
+                }
 
                 // Ensure volume is adequate
                 val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
