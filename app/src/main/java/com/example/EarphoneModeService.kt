@@ -29,7 +29,12 @@ class EarphoneModeService : Service() {
         override fun run() {
             if (isSpeakerMode) {
                 applySpeakerRouting(true)
-                handler.postDelayed(this, 1500)
+                // Quand le systeme refuse le forcage (permission MODIFY_AUDIO_ROUTING absente),
+                // le refus est definitif : le marteler toutes les 1,5 s ne ferait que vider la
+                // batterie. On s'arrete, les callbacks evenementiels restent actifs.
+                if (!RoutingDiagnostics.forcingRefused) {
+                    handler.postDelayed(this, 1500)
+                }
             }
         }
     }
@@ -106,7 +111,7 @@ class EarphoneModeService : Service() {
                     }
                 }
 
-                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
+                RoutingDiagnostics.applyForceUse(true)
 
                 // OEM Hardware Audio Parameters
                 try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
@@ -131,7 +136,7 @@ class EarphoneModeService : Service() {
                     } catch (e: Exception) {}
                 }
 
-                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(false))
+                RoutingDiagnostics.applyForceUse(false)
 
                 try { audioManager.setParameters("routing=0") } catch (e: Exception) {}
                 try { audioManager.setParameters("force_speaker=0") } catch (e: Exception) {}

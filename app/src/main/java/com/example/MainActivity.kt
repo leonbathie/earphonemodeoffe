@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -186,7 +187,7 @@ class MainActivity : ComponentActivity() {
             val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
 
-            RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
+            RoutingDiagnostics.applyForceUse(true)
 
             // 1. Sinusoide synthetisee en USAGE_MEDIA / CONTENT_TYPE_MUSIC.
             // C'est volontairement le meme chemin audio que TikTok ou YouTube : si ce son
@@ -341,7 +342,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(true))
+                RoutingDiagnostics.applyForceUse(true)
 
                 // OEM Hardware Audio Parameters
                 try { audioManager.setParameters("routing=2") } catch (e: Exception) {}
@@ -365,7 +366,7 @@ class MainActivity : ComponentActivity() {
                     } catch (e: Exception) {}
                 }
                 
-                RoutingDiagnostics.record(RoutingDiagnostics.applyForceUse(false))
+                RoutingDiagnostics.applyForceUse(false)
 
                 try { audioManager.setParameters("routing=0") } catch (e: Exception) {}
                 try { audioManager.setParameters("force_speaker=0") } catch (e: Exception) {}
@@ -406,14 +407,21 @@ fun EarphoneModeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.Top)
     ) {
+        // Le forcage a-t-il ete refuse par le systeme ? Tant qu'on est en mode ecouteurs,
+        // la question ne se pose pas.
+        val forcingRefused = isSpeakerMode && RoutingDiagnostics.forcingRefused
+
         // Status Graphic
         Box(
             modifier = Modifier
                 .size(130.dp)
                 .clip(RoundedCornerShape(32.dp))
                 .background(
-                    if (isSpeakerMode) MaterialTheme.colorScheme.primaryContainer 
-                    else MaterialTheme.colorScheme.secondaryContainer
+                    when {
+                        forcingRefused -> MaterialTheme.colorScheme.errorContainer
+                        isSpeakerMode -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    }
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -421,24 +429,85 @@ fun EarphoneModeScreen(
                 imageVector = if (isSpeakerMode) Icons.Default.Speaker else Icons.Default.Headphones,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = if (isSpeakerMode) MaterialTheme.colorScheme.onPrimaryContainer 
-                       else MaterialTheme.colorScheme.onSecondaryContainer
+                tint = when {
+                    forcingRefused -> MaterialTheme.colorScheme.onErrorContainer
+                    isSpeakerMode -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSecondaryContainer
+                }
             )
         }
 
         Text(
-            text = if (isSpeakerMode) "Speaker Mode Active" else "Earphone Mode Active",
+            text = when {
+                forcingRefused -> "Forçage refusé par Android"
+                isSpeakerMode -> "Haut-parleur forcé"
+                else -> "Mode écouteurs"
+            },
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
-        
+
         Text(
-            text = "Forcing sound to Speaker while earphones remain plugged in. Works with YouTube, TikTok, and Media.",
+            text = when {
+                forcingRefused ->
+                    "Ce téléphone n'autorise pas une application ordinaire à rediriger le son " +
+                    "des autres applications. Le son de TikTok ou YouTube continuera de suivre " +
+                    "le casque détecté."
+                isSpeakerMode ->
+                    "Le son est redirigé vers le haut-parleur même si un casque est détecté."
+                else ->
+                    "Routage audio par défaut : le son suit le casque quand il est détecté."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
+
+        // Quand le forcage est refuse, on ne laisse pas l'utilisateur sans solution :
+        // le selecteur de sortie d'Android, lui, fonctionne sans permission particuliere.
+        if (forcingRefused) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Ce qui marche à la place",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "Lancez la vidéo, déroulez le volet de notifications, touchez " +
+                                   "l'icône de sortie audio du panneau média, puis choisissez " +
+                                   "« Haut-parleur du téléphone ».",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "Si aucun casque n'est branché alors que le diagnostic indique " +
+                                   "WiredHeadset = true, la prise est probablement encrassée : " +
+                                   "nettoyez-la, téléphone éteint.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+        }
 
         // Main Toggle Controls
         Row(
