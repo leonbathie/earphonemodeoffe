@@ -30,15 +30,28 @@ jobs:
         uses: android-actions/setup-android@v3
 
       # Ce projet (export AI Studio) n'a PAS de wrapper Gradle : on installe Gradle ici.
-      # Si le log echoue avec "Minimum supported Gradle version is X",
-      # remplacer la version ci-dessous par X et repousser.
+      # Version imposee par AGP 9.1.1, qui exige Gradle 9.3.1 minimum.
       - name: Installer Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.1.0'
+          gradle-version: '9.3.1'
 
+      # --no-configuration-cache : gradle.properties active le cache de configuration,
+      # mais secrets-gradle-plugin 2.0.1 n'est pas compatible et Gradle 9 en fait une
+      # erreur bloquante. On le desactive ici sans toucher au build local.
       - name: Compiler l'APK debug
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug --no-configuration-cache --stacktrace
+
+      # Recupere les rapports meme quand le build casse, pour diagnostiquer.
+      - name: Recuperer les rapports en cas d'echec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-build
+          path: |
+            app/build/reports/**
+            build/reports/**
+          if-no-files-found: ignore
 
       # Chemin 1 : artefact de build. Se telecharge en .zip, il faut le decompresser.
       - name: Publier l'APK en artefact
